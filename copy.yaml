@@ -1,6 +1,26 @@
----
+- hosts: localhost
+  gather_facts: true
+  become: false
+  tasks:
+  - shell:
+      cmd: terraform output public_ip
+    register: terraform
+
+  - ansible.builtin.debug:
+      var: terraform.stdout
+
+  - name: Update Inventory
+    ansible.builtin.add_host:
+      name: "{{ item }}"
+      groups: app
+      ansible_ssh_private_key_file: jenkins.pem
+      ansible_user: ubuntu
+    loop: "{{ terraform.stdout }}"
+
 - hosts: app
+  gather_facts: true
   become: true
+  user: root
   tasks:
     - name: Installing Jdk
       apt:
@@ -34,7 +54,7 @@
         
     - name: copying webapp
       copy:
-        src: ./webapp/target/webapp.war
+        src: ./target/raviLogin-1.0.war
         dest: /usr/local/tomcat7/webapps/
     
     - name: Starting Tomcat
