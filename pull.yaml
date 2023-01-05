@@ -1,6 +1,0 @@
----
-- hosts: docker
-  become: true
-  tasks:
-    - name: docker run
-      shell: docker run -d -p 8080:8080 public.ecr.aws/x5q3g8p0/demo
