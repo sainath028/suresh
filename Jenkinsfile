@@ -1,57 +1,71 @@
 pipeline {
     agent any
-    tools {
+    tools{
+        terraform "terraform"
         maven "maven"
+       
     }
-    
-     stages {
-     	stage("clone code"){
-	        steps{
-	           sh 'rm -rf *'
-	           git branch: 'main', url: 'https://github.com/suresh30467/suresh-1.git'   
-	        }
-	    }
-
-        stage ('build with maven'){
+    parameters {
+        choice(
+            name: 'Infrastructure',
+            choices: ['create', 'destroy'],
+            description: ''
+        )
+    }
+    environment {
+        AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
+        AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+    }
+    stages {
+        stage('git clone') {
             steps {
-                sh 'mvn clean install -DskipTests'
+              git branch: 'terraform', url: "https://github.com/sainath028/suresh.git" 
+              sh "ls -ll"
             }
-		}	
-
-
-        stage ('ansible'){
+        }
+        stage ('Build') {
             steps {
-                sh 'docker build -t demo .'
-
+                sh "mvn clean install -DskipTests"
             }
-		}
-        stage ('docker login'){
+        }
+        
+        stage('terraform init') {
             steps {
-                sh 'aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/x5q3g8p0'
+              sh "terraform init" 
             }
-		}	
-
-        stage ('tag'){
+        }
+        
+        stage('terraform plan') {
             steps {
-                sh 'docker tag demo:latest public.ecr.aws/x5q3g8p0/demo:latest'
-
+                script {
+                    sh  "ls -ll"
+                    sh "terraform plan"
+                }
             }
-		}
-
-        stage ('push'){
+        }
+        
+        stage('terraform apply') {
             steps {
-                sh 'docker push public.ecr.aws/x5q3g8p0/demo:latest'
-
+                script {
+                    if (env.Infrastructure == 'create') {
+                        sh "terraform apply -no-color --auto-approve"
+                    } else {
+                        sh "terraform destroy -no-color --auto-approve"
+                    }
+                }  
             }
-		}
-
-        stage ('deploy'){
+        }
+        stage ('deployment') {
             steps {
-                sh 'chmod 400 surya1.pem'
-                sh 'ansible-playbook -i hosts pull.yaml'
-
+                script {
+                    if (env.Infrastructure == 'create') {
+                        sh "chmod 400 jenkins.pem"
+                        sh "ansible-playbook copy.yaml"
+                    } else {
+                        echo 'destroyed'
+                    }
+                }  
             }
-		}
-
+        }                
     }
 }
